@@ -17,6 +17,8 @@ void cli(int argc, char *argv[], char **host_ip, int *host_port) {
     exit(EXIT_FAILURE);
   }
 
+   *host_ip = argv[1];
+
   if (argc == 3) {
     *host_port = atoi(argv[2]);
     if (*host_port <= 0 || *host_port > 65535) {
@@ -46,7 +48,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  server_address.sin_addr.s_addr = AF_INET;
+  server_address.sin_family = AF_INET;
   server_address.sin_port = htons(port);
 
   // convert IPv4 address from dec to bin.
