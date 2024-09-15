@@ -1,4 +1,5 @@
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -54,6 +55,12 @@ void create_connection(int *server_socket, int *client_socket, int port) {
   }
 }
 
+void clean(Display *display, int server, int client) {
+  XCloseDisplay(display);
+  close(client);
+  close(server);
+}
+
 int main(int argc, char *argv[]) {
 
   int server_socket, client_socket;
@@ -71,18 +78,44 @@ int main(int argc, char *argv[]) {
   Screen *screen = XDefaultScreenOfDisplay(display);
   int height = screen->height;
   int width = screen->width;
+  int depth = screen->depths->depth;
+  // bytes per pixel
+  int bpp = depth / 8;
 
-  printf("Height: %dpx, Width: %dpx\n", height, width);
+  printf("Height: %dpx, Width: %dpx, Depth: %d\n", height, width, depth);
 
-  // todo: capture screen, keyboard input
+  Window root = XDefaultRootWindow(display);
 
+  XImage *image;
   while (1) {
+
+    // capture screen
+    image = XGetImage(display, root, 0, 0, width, height, AllPlanes, ZPixmap);
+
+    if (image == NULL) {
+      perror("Could not capture screen.");
+      clean(display, client_socket, server_socket);
+      exit(EXIT_FAILURE);
+    }
+
+    // send image width
+    send(client_socket, &width, sizeof(width), 0);
+
+    // send image height
+    send(client_socket, &height, sizeof(height), 0);
+
+    // send image data one row at a time
+    for(int row = 0; row < height; row++) {
+        send(client_socket, image->data + row * image->bytes_per_line, width * bpp, 0);
+    }
+
+    printf("sent data\n");
+
+    XDestroyImage(image);
+    usleep(FREQUENCY_MS);
   }
 
-  // clean up
-  XCloseDisplay(display);
-  close(client_socket);
-  close(server_socket);
+  clean(display, server_socket, client_socket);
 
   return 0;
 }
