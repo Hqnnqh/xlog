@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
   Window root = XDefaultRootWindow(display);
 
   XImage *image;
+  ssize_t bytes_sent;
   while (1) {
 
     // capture screen
@@ -99,17 +100,46 @@ int main(int argc, char *argv[]) {
     }
 
     // send image width
-    send(client_socket, &width, sizeof(width), 0);
+    bytes_sent = send(client_socket, &width, sizeof(width), 0);
 
-    // send image height
-    send(client_socket, &height, sizeof(height), 0);
-
-    // send image data one row at a time
-    for(int row = 0; row < height; row++) {
-        send(client_socket, image->data + row * image->bytes_per_line, width * bpp, 0);
+    if (bytes_sent < 0) {
+      perror("Error sending width to client.");
+      clean(display, server_socket, client_socket);
+      exit(EXIT_FAILURE);
     }
 
-    printf("sent data\n");
+    // send image height
+    bytes_sent = send(client_socket, &height, sizeof(height), 0);
+
+    if (bytes_sent < 0) {
+      perror("Error sending height to client.");
+      clean(display, server_socket, client_socket);
+      exit(EXIT_FAILURE);
+    }
+
+    // send image depth
+    bytes_sent = send(client_socket, &depth, sizeof(depth), 0);
+
+    if (bytes_sent < 0) {
+      perror("Error sending depth to client.");
+      clean(display, server_socket, client_socket);
+      exit(EXIT_FAILURE);
+    }
+
+    // send image data one row at a time
+    for (int row = 0; row < height; row++) {
+      bytes_sent =
+          send(client_socket, image->data + row * image->bytes_per_line,
+               width * bpp, 0);
+
+      if (bytes_sent < 0) {
+        perror("Error sending image row to client.");
+        clean(display, server_socket, client_socket);
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    printf("sent data to client.\n");
 
     XDestroyImage(image);
     usleep(FREQUENCY_MS);
